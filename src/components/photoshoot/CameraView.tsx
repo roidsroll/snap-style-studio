@@ -21,12 +21,14 @@ const BURST_OPTIONS = [1, 3, 6] as const;
 export function CameraView({ onCapture }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterId, setFilterId] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
   const [flashing, setFlashing] = useState(false);
+  // Manual mirror toggle. Default: mirror ON for front camera, OFF for back.
+  const [mirror, setMirror] = useState(true);
 
   const [timerSec, setTimerSec] = useState<(typeof TIMER_OPTIONS)[number]>(0);
   const [burstCount, setBurstCount] = useState<(typeof BURST_OPTIONS)[number]>(1);

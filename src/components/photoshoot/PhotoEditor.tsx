@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, X, Trash2, Smile, Plus, ChevronLeft, ChevronRight, DownloadCloud } from "lucide-react";
+import { Download, X, Trash2, Smile, Plus, ChevronLeft, ChevronRight, DownloadCloud, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface PhotoEditorProps {

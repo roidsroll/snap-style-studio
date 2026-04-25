@@ -24,13 +24,15 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[] | null>(null);
 
   return (
     <main className="fixed inset-0 flex flex-col bg-surface">
       <h1 className="sr-only">snap. mobile photoshoot studio</h1>
-      <CameraView onCapture={setPhoto} />
-      {photo && <PhotoEditor imageDataUrl={photo} onClose={() => setPhoto(null)} />}
+      <CameraView onCapture={setPhotos} />
+      {photos && photos.length > 0 && (
+        <PhotoEditor imageDataUrls={photos} onClose={() => setPhotos(null)} />
+      )}
       <Toaster
         position="top-center"
         theme="dark"

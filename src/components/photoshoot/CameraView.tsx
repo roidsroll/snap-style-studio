@@ -190,7 +190,7 @@ export function CameraView({ onCapture }: CameraViewProps) {
         className="h-full w-full object-cover"
         style={{
           filter: filter.css,
-          transform: facingMode === "user" ? "scaleX(-1)" : undefined,
+          transform: mirror ? "scaleX(-1)" : undefined,
         }}
       />
 

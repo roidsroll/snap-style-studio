@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, RotateCcw, Image as ImageIcon, Sparkles, X, Timer, Layers } from "lucide-react";
+import { Camera, RotateCcw, Image as ImageIcon, Sparkles, X, Timer, Layers, FlipHorizontal2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface CameraViewProps {

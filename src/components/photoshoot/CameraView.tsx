@@ -319,14 +319,35 @@ export function CameraView({ onCapture }: CameraViewProps) {
           )}
         </button>
 
-        <button
-          onClick={() => setFacingMode((m) => (m === "user" ? "environment" : "user"))}
-          aria-label="Balik kamera"
-          disabled={capturing}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface/60 text-surface-foreground backdrop-blur-md transition-bounce active:scale-90 active:rotate-180 disabled:opacity-50"
-        >
-          <RotateCcw className="h-5 w-5" />
-        </button>
+        <div className="flex flex-col items-center gap-2">
+          <button
+            onClick={() =>
+              setFacingMode((m) => {
+                const next = m === "user" ? "environment" : "user";
+                setMirror(next === "user");
+                return next;
+              })
+            }
+            aria-label="Balik kamera"
+            disabled={capturing}
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface/60 text-surface-foreground backdrop-blur-md transition-bounce active:scale-90 active:rotate-180 disabled:opacity-50"
+          >
+            <RotateCcw className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setMirror((v) => !v)}
+            aria-label={mirror ? "Matikan mirror" : "Aktifkan mirror"}
+            disabled={capturing}
+            className={`flex h-8 w-12 items-center justify-center rounded-full text-[10px] font-semibold backdrop-blur-md transition-bounce active:scale-90 disabled:opacity-50 ${
+              mirror
+                ? "bg-primary text-primary-foreground"
+                : "bg-surface/60 text-surface-foreground/80"
+            }`}
+            title="Mirror"
+          >
+            <FlipHorizontal2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );

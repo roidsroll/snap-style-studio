@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, X, Trash2, Smile, Plus } from "lucide-react";
+import { Download, X, Trash2, Smile, Plus, ChevronLeft, ChevronRight, DownloadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 interface PhotoEditorProps {
-  imageDataUrl: string;
+  imageDataUrls: string[];
   onClose: () => void;
 }
 
 interface Sticker {
   id: string;
   emoji: string;
-  // Position as fraction (0-1) of image dimensions for resolution-independence
   x: number;
   y: number;
-  size: number; // in px relative to displayed image
-  rotation: number; // degrees
+  size: number;
+  rotation: number;
 }
 
 const EMOJI_LIBRARY = [
@@ -29,14 +28,76 @@ const EMOJI_LIBRARY = [
 let stickerCounter = 0;
 const newId = () => `s_${Date.now()}_${stickerCounter++}`;
 
-export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
+async function renderPhoto(
+  imageDataUrl: string,
+  stickers: Sticker[],
+  displayedWidth: number,
+): Promise<Blob> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = imageDataUrl;
+  await new Promise<void>((res, rej) => {
+    img.onload = () => res();
+    img.onerror = () => rej(new Error("Gagal memuat gambar"));
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas tidak tersedia");
+
+  ctx.drawImage(img, 0, 0);
+
+  const scale = img.naturalWidth / (displayedWidth || img.naturalWidth);
+
+  for (const s of stickers) {
+    const sizePx = s.size * scale;
+    const cx = s.x * canvas.width;
+    const cy = s.y * canvas.height;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((s.rotation * Math.PI) / 180);
+    ctx.font = `${sizePx}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(s.emoji, 0, 0);
+    ctx.restore();
+  }
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Gagal membuat gambar"))),
+      "image/png",
+      1.0,
+    );
+  });
+}
+
+export function PhotoEditor({ imageDataUrls, onClose }: PhotoEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const [stickers, setStickers] = useState<Sticker[]>([]);
+  const [activeIdx, setActiveIdx] = useState(0);
+  // Per-photo sticker arrays, indexed by photo position
+  const [stickersByPhoto, setStickersByPhoto] = useState<Sticker[][]>(() =>
+    imageDataUrls.map(() => []),
+  );
   const [selected, setSelected] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
   const [downloading, setDownloading] = useState(false);
+
+  const stickers = stickersByPhoto[activeIdx] ?? [];
+  const setStickers = (updater: (prev: Sticker[]) => Sticker[]) => {
+    setStickersByPhoto((all) =>
+      all.map((arr, i) => (i === activeIdx ? updater(arr) : arr)),
+    );
+  };
+
+  useEffect(() => {
+    setSelected(null);
+    setPickerOpen(false);
+  }, [activeIdx]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -45,10 +106,13 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
         setStickers((s) => s.filter((x) => x.id !== selected));
         setSelected(null);
       }
+      if (e.key === "ArrowLeft") setActiveIdx((i) => Math.max(0, i - 1));
+      if (e.key === "ArrowRight")
+        setActiveIdx((i) => Math.min(imageDataUrls.length - 1, i + 1));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected]);
+  }, [selected, imageDataUrls.length]);
 
   const updateImgSize = () => {
     if (imgRef.current) {
@@ -74,7 +138,6 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
     setPickerOpen(false);
   };
 
-  // Drag with pointer events for touch/mouse
   const startDrag = (e: React.PointerEvent, id: string) => {
     e.stopPropagation();
     setSelected(id);
@@ -114,7 +177,6 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
     target.addEventListener("pointercancel", onUp);
   };
 
-  // Resize + rotate via the corner handle
   const startTransform = (e: React.PointerEvent, id: string) => {
     e.stopPropagation();
     const target = e.currentTarget as HTMLElement;
@@ -159,69 +221,59 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
     setSelected(null);
   };
 
-  const handleDownload = async () => {
+  const triggerDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleDownloadCurrent = async () => {
     if (!imgRef.current) return;
     setDownloading(true);
     try {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = imageDataUrl;
-      await new Promise<void>((res, rej) => {
-        img.onload = () => res();
-        img.onerror = () => rej(new Error("Gagal memuat gambar"));
-      });
-
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas tidak tersedia");
-
-      ctx.drawImage(img, 0, 0);
-
-      // Map displayed size -> natural size
-      const scale = img.naturalWidth / (imgRef.current.clientWidth || 1);
-
-      for (const s of stickers) {
-        const sizePx = s.size * scale;
-        const cx = s.x * canvas.width;
-        const cy = s.y * canvas.height;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate((s.rotation * Math.PI) / 180);
-        ctx.font = `${sizePx}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(s.emoji, 0, 0);
-        ctx.restore();
-      }
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            toast.error("Gagal membuat gambar");
-            setDownloading(false);
-            return;
-          }
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `snap-${Date.now()}.png`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-          toast.success("Foto berhasil diunduh ✨");
-          setDownloading(false);
-        },
-        "image/png",
-        1.0,
+      const blob = await renderPhoto(
+        imageDataUrls[activeIdx],
+        stickers,
+        imgRef.current.clientWidth,
       );
+      triggerDownload(blob, `snap-${Date.now()}-${activeIdx + 1}.png`);
+      toast.success("Foto berhasil diunduh ✨");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal mengunduh");
+    } finally {
       setDownloading(false);
     }
   };
+
+  const handleDownloadAll = async () => {
+    if (!imgRef.current) return;
+    setDownloading(true);
+    const displayedWidth = imgRef.current.clientWidth;
+    try {
+      for (let i = 0; i < imageDataUrls.length; i++) {
+        const blob = await renderPhoto(
+          imageDataUrls[i],
+          stickersByPhoto[i] ?? [],
+          displayedWidth,
+        );
+        triggerDownload(blob, `snap-${Date.now()}-${i + 1}.png`);
+        // small spacing so browsers handle multiple downloads
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      toast.success(`${imageDataUrls.length} foto berhasil diunduh ✨`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal mengunduh");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const multi = imageDataUrls.length > 1;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-surface text-surface-foreground animate-pop-in">
@@ -234,15 +286,30 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
         >
           <X className="h-5 w-5" />
         </button>
-        <span className="font-display text-sm font-semibold">Edit foto</span>
-        <button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition-bounce active:scale-95 disabled:opacity-60"
-        >
-          <Download className="h-4 w-4" />
-          {downloading ? "..." : "Simpan"}
-        </button>
+        <span className="font-display text-sm font-semibold">
+          {multi ? `Foto ${activeIdx + 1} / ${imageDataUrls.length}` : "Edit foto"}
+        </span>
+        <div className="flex items-center gap-2">
+          {multi && (
+            <button
+              onClick={handleDownloadAll}
+              disabled={downloading}
+              className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-xs font-medium text-surface-foreground transition-bounce active:scale-95 disabled:opacity-60"
+              aria-label="Unduh semua"
+            >
+              <DownloadCloud className="h-4 w-4" />
+              Semua
+            </button>
+          )}
+          <button
+            onClick={handleDownloadCurrent}
+            disabled={downloading}
+            className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition-bounce active:scale-95 disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {downloading ? "..." : "Simpan"}
+          </button>
+        </div>
       </div>
 
       {/* Canvas area */}
@@ -250,6 +317,31 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
         className="relative flex flex-1 items-center justify-center overflow-hidden p-2"
         onClick={() => setSelected(null)}
       >
+        {multi && activeIdx > 0 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveIdx((i) => Math.max(0, i - 1));
+            }}
+            aria-label="Foto sebelumnya"
+            className="absolute left-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition-bounce active:scale-90"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+        {multi && activeIdx < imageDataUrls.length - 1 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveIdx((i) => Math.min(imageDataUrls.length - 1, i + 1));
+            }}
+            aria-label="Foto berikutnya"
+            className="absolute right-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-md transition-bounce active:scale-90"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+
         <div
           ref={containerRef}
           className="relative max-h-full max-w-full"
@@ -257,10 +349,11 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
         >
           <img
             ref={imgRef}
-            src={imageDataUrl}
-            alt="Preview"
+            key={activeIdx}
+            src={imageDataUrls[activeIdx]}
+            alt={`Preview ${activeIdx + 1}`}
             onLoad={updateImgSize}
-            className="block max-h-[calc(100vh-260px)] max-w-full rounded-2xl shadow-soft"
+            className="block max-h-[calc(100vh-300px)] max-w-full rounded-2xl shadow-soft"
             draggable={false}
           />
           {imgSize.w > 0 &&
@@ -324,6 +417,38 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
         </div>
       </div>
 
+      {/* Thumbnail strip for multi-shot */}
+      {multi && (
+        <div className="px-3 pb-2">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
+            {imageDataUrls.map((url, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveIdx(i)}
+                className={`relative shrink-0 overflow-hidden rounded-lg transition-bounce ${
+                  i === activeIdx
+                    ? "ring-2 ring-primary scale-105"
+                    : "ring-1 ring-white/15 opacity-70"
+                }`}
+                aria-label={`Pilih foto ${i + 1}`}
+              >
+                <img
+                  src={url}
+                  alt={`Foto ${i + 1}`}
+                  className="h-14 w-14 object-cover"
+                  draggable={false}
+                />
+                {(stickersByPhoto[i]?.length ?? 0) > 0 && (
+                  <span className="absolute right-0.5 top-0.5 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                    {stickersByPhoto[i].length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Bottom toolbar */}
       <div className="border-t border-white/10 bg-surface/80 p-4 pb-6 backdrop-blur-md">
         <div className="flex items-center justify-between gap-3">
@@ -362,7 +487,9 @@ export function PhotoEditor({ imageDataUrl, onClose }: PhotoEditorProps) {
         )}
 
         <p className="mt-3 text-center text-xs text-white/50">
-          Geser untuk pindah · Tarik titik biru untuk ukuran & putar
+          {multi
+            ? "Setiap foto bisa dihias terpisah · Geser untuk pindah stiker"
+            : "Geser untuk pindah · Tarik titik biru untuk ukuran & putar"}
         </p>
       </div>
     </div>

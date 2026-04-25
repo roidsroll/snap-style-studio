@@ -86,6 +86,8 @@ export function PhotoEditor({ imageDataUrls, onClose }: PhotoEditorProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
   const [downloading, setDownloading] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customText, setCustomText] = useState("");
 
   const stickers = stickersByPhoto[activeIdx] ?? [];
   const setStickers = (updater: (prev: Sticker[]) => Sticker[]) => {

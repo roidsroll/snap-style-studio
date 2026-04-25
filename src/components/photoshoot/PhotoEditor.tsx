@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, X, Trash2, Smile, Plus, ChevronLeft, ChevronRight, DownloadCloud } from "lucide-react";
+import { Download, X, Trash2, Smile, Plus, ChevronLeft, ChevronRight, DownloadCloud, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface PhotoEditorProps {
@@ -86,6 +86,8 @@ export function PhotoEditor({ imageDataUrls, onClose }: PhotoEditorProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
   const [downloading, setDownloading] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customText, setCustomText] = useState("");
 
   const stickers = stickersByPhoto[activeIdx] ?? [];
   const setStickers = (updater: (prev: Sticker[]) => Sticker[]) => {
@@ -459,6 +461,17 @@ export function PhotoEditor({ imageDataUrls, onClose }: PhotoEditorProps) {
             <Smile className="h-5 w-5 text-primary-glow" />
             {pickerOpen ? "Tutup emoji" : "Tambah emoji"}
           </button>
+          <button
+            onClick={() => {
+              setCustomOpen(true);
+              setCustomText("");
+            }}
+            className="flex h-12 items-center justify-center gap-1.5 rounded-2xl bg-primary/20 px-4 text-sm font-medium text-primary-glow transition-bounce active:scale-95"
+            aria-label="Tambah emoji custom"
+          >
+            <Sparkles className="h-4 w-4" />
+            Custom
+          </button>
           {selected && (
             <button
               onClick={() => removeSticker(selected)}
@@ -492,6 +505,70 @@ export function PhotoEditor({ imageDataUrls, onClose }: PhotoEditorProps) {
             : "Geser untuk pindah · Tarik titik biru untuk ukuran & putar"}
         </p>
       </div>
+
+      {/* Custom emoji modal */}
+      {customOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-pop-in"
+          onClick={() => setCustomOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl bg-surface p-6 shadow-glow ring-1 ring-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="font-display text-lg font-semibold text-surface-foreground">
+                Emoji custom
+              </h3>
+              <button
+                onClick={() => setCustomOpen(false)}
+                aria-label="Tutup"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-surface-foreground transition-bounce active:scale-90"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-4 text-xs text-white/60">
+              Ketik emoji apa pun dari keyboard kamu (😀, 🎂, 🐉, dst), lalu
+              tambahkan ke foto.
+            </p>
+            <input
+              autoFocus
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customText.trim()) {
+                  addEmoji(customText.trim());
+                  setCustomOpen(false);
+                  toast.success("Emoji ditambahkan ✨");
+                }
+              }}
+              placeholder="Ketik emoji di sini…"
+              className="w-full rounded-2xl bg-white/5 px-4 py-4 text-center text-3xl text-surface-foreground outline-none ring-1 ring-white/10 focus:ring-primary"
+            />
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setCustomOpen(false)}
+                className="flex-1 rounded-2xl bg-white/10 py-3 text-sm font-medium text-surface-foreground transition-bounce active:scale-95"
+              >
+                Batal
+              </button>
+              <button
+                disabled={!customText.trim()}
+                onClick={() => {
+                  if (!customText.trim()) return;
+                  addEmoji(customText.trim());
+                  setCustomOpen(false);
+                  toast.success("Emoji ditambahkan ✨");
+                }}
+                className="flex-1 rounded-2xl bg-primary py-3 text-sm font-medium text-primary-foreground shadow-glow transition-bounce active:scale-95 disabled:opacity-50"
+              >
+                Tambahkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

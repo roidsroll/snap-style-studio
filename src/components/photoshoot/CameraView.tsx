@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, RotateCcw, Image as ImageIcon, Sparkles, X, Timer, Layers } from "lucide-react";
+import { Camera, RotateCcw, Image as ImageIcon, Sparkles, X, Timer, Layers, FlipHorizontal2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface CameraViewProps {
@@ -21,12 +21,14 @@ const BURST_OPTIONS = [1, 3, 6] as const;
 export function CameraView({ onCapture }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterId, setFilterId] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
   const [flashing, setFlashing] = useState(false);
+  // Manual mirror toggle. Default: mirror ON for front camera, OFF for back.
+  const [mirror, setMirror] = useState(true);
 
   const [timerSec, setTimerSec] = useState<(typeof TIMER_OPTIONS)[number]>(0);
   const [burstCount, setBurstCount] = useState<(typeof BURST_OPTIONS)[number]>(1);
@@ -82,7 +84,7 @@ export function CameraView({ onCapture }: CameraViewProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.filter = filter.css;
-    if (facingMode === "user") {
+    if (mirror) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
@@ -188,7 +190,7 @@ export function CameraView({ onCapture }: CameraViewProps) {
         className="h-full w-full object-cover"
         style={{
           filter: filter.css,
-          transform: facingMode === "user" ? "scaleX(-1)" : undefined,
+          transform: mirror ? "scaleX(-1)" : undefined,
         }}
       />
 
@@ -317,14 +319,35 @@ export function CameraView({ onCapture }: CameraViewProps) {
           )}
         </button>
 
-        <button
-          onClick={() => setFacingMode((m) => (m === "user" ? "environment" : "user"))}
-          aria-label="Balik kamera"
-          disabled={capturing}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface/60 text-surface-foreground backdrop-blur-md transition-bounce active:scale-90 active:rotate-180 disabled:opacity-50"
-        >
-          <RotateCcw className="h-5 w-5" />
-        </button>
+        <div className="flex flex-col items-center gap-2">
+          <button
+            onClick={() =>
+              setFacingMode((m) => {
+                const next = m === "user" ? "environment" : "user";
+                setMirror(next === "user");
+                return next;
+              })
+            }
+            aria-label="Balik kamera"
+            disabled={capturing}
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface/60 text-surface-foreground backdrop-blur-md transition-bounce active:scale-90 active:rotate-180 disabled:opacity-50"
+          >
+            <RotateCcw className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setMirror((v) => !v)}
+            aria-label={mirror ? "Matikan mirror" : "Aktifkan mirror"}
+            disabled={capturing}
+            className={`flex h-8 w-12 items-center justify-center rounded-full text-[10px] font-semibold backdrop-blur-md transition-bounce active:scale-90 disabled:opacity-50 ${
+              mirror
+                ? "bg-primary text-primary-foreground"
+                : "bg-surface/60 text-surface-foreground/80"
+            }`}
+            title="Mirror"
+          >
+            <FlipHorizontal2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );
